@@ -176,11 +176,11 @@ class ClientServer implements Runnable {
 						String page = getPage("index.html");
 						outToClient.writeBytes(page);
 					}
-
+				}
 				if(currentQuiz != prevQuiz) {
-					runGame();
 					// Send the quiz info to the client using xmlhttprequest
-
+					sendGame();
+					int answer = waitAndReceive(inFromClient);
 					// Receive client's answer to the quiz and update score
 					// Need to get variable string answer from client
 					score = currentQuiz.calcScore(answer);
@@ -188,6 +188,8 @@ class ClientServer implements Runnable {
 					prevQuiz = currentQuiz;
 				}
 			}
+		} catch(IOException e) {
+			e.printTraceStack();
 		}
 	}
 	public void start() {
@@ -196,7 +198,38 @@ class ClientServer implements Runnable {
 			t.start();
 		}
 	}
-
+	// Wait to receive the client's answer to the Quiz. While we wait, check for page requests, ya know.
+	public int waitAndReceive(BufferedReader inFromClient) {
+		boolean drLupo = true;
+		while(drLupo) {
+			String request = inFromClient.readLine();
+			String[] requestWords = request.split(" ");
+			if(requestWords.length == 3) {
+				if(requestWords[0].equals("GET") && requestWords[1].equals("/")) {
+					String page = getPage("index.html");
+					outToClient.writeBytes(page);
+				}
+				if(requestWords[0].equals("POST") && requestWords[1].equals("/quiz")) {
+					// Code for parsing the POST request
+					// Should be in x-www-form-urlencoded format
+					boolean noBlank = true;
+					String line = "";
+					int contentLength = 0;
+					while(noBlank) {
+						line = inFromClient.readLine();
+						if(s.toLowerCase().contains("Content-length"))
+							contentLength = Integer.valueOf(s.split[1]);
+						if(s.equals(""))
+							noBlank = false;
+					}
+					char[] body = new char[contentLength];
+					String body = String.valueOf(body);
+					int answer = Integer.valueOf(body.split("=")[1]);
+					return answer;
+				}
+			}
+		}
+	}
 	public static int getNewID() {
 		return currentID++;
 	}
