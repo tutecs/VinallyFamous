@@ -1,10 +1,17 @@
 // VineQuiz server program.
 // Ethan Duryea, Elliot Spicer, Joshua Weller, John Zamites
 // CSCI 420: Networking, Project 2018, April 2018
-
+//
+// TODO:
+// Need to get the username from the client
+// Should send a startup page when the client connects with a prompt that asks them to enter a name
+// Once they submit, we can send the client the main game page.
+// We also need to send the scores with the main game page.
 
 import java.io.*;
 import java.net.*;
+import java.nio.file.*;
+import java.text.*;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -13,35 +20,78 @@ public class VineServer {
 	public static void main(String[] args) {
 		ArrayList<ClientServer> clients = new ArrayList<ClientServer>();
 		try {
+
+			QuizGetter quizGetter = null;
+
 			ServerSocket listenSocket = new ServerSocket(port);
-			//
-			// TODO :
-			// 	Get a new quiz every 7 seconds.
-			// 	Update our client list every loop. ie check if each thread is still active
-			// 	We need to split the connection handling and the quiz serving.
-			// 	We should create another thread to handle the quiz serving.
-			Date date = new Date();
-			long beginTime = date.getTime();
+			// This represents the previous number connected clients.
+			// This variable will be used to trigger the quizMaker thread.
+			int prevN = 0;
 			while(true) {
+				for(int i = 0; i < clients.size(); i++) {
+					if(clients.get(i).isActive() == false) {
+						clients.remove(i);
+					}
+				}
 				Socket connectionSocket = listenSocket.accept();
 				ClientServer server = new ClientServer(connectionSocket);
 				server.start();
 				clients.add(server);
-				ClientServer server = new ClientServer(connectionSocket);
-				server.start();
-				clients.add(server);
-				long currentTime = date.getTime();
-				long diffInMillies = currentTime - beginTime();
-				long diffInSeconds = TimeUnit.SECONDS.convert(diffInMillies, TimeUnit.MILLIESECONDS);
-				if(diffInSeconds >= )
-
+				if(clients.size() == 1 && clients.size() - prevN > 0) {
+					quizGetter = new QuizGetter("QuizGetter", 13);
+					quizGetter.start();
+				}
+				if(clients.size() == 0 && clients.size() - prevN < 0) {
+					quizGetter.stop();
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-
 }
+// QuizGetter Class. Updates the currentQuiz of the ClientServer class every x seconds
+class QuizGetter implements Runnable {
+	private volatile boolean active;
+	private String threadName;
+	private Thread t;
+	private int updateTime;
+	public QuizGetter(String threadName, int updateTime) {
+		this.threadName = threadName;
+		this.updateTime = updateTime;
+		this.active = true;
+	}
+	public void run() {
+		// A date object to help schedule new quiz updates
+		Date date = new Date();
+		long beginTime = date.getTime();
+		while(active) {
+			// Get the current time
+			long currentTime = date.getTime();
+			// Get the difference in time
+			long diffInMillis = currentTime - beginTime;
+			// Conver the difference from millieseconds to seconds
+			long diffInSeconds = TimeUnit.SECONDS.convert(diffInMillis, TimeUnit.MILLISECONDS);
+			// Load a new quiz every 7 seconds
+			if(diffInSeconds >= updateTime) {
+				Quiz quiz = Quiz.newQuiz();
+				ClientServer.updateQuiz(quiz);
+				beginTime = date.getTime();
+			}
+		}
+	}
+	public void start() {
+		if(t == null) {
+			t = new Thread(this, threadName);
+			t.start();
+		}
+	}
+	public void stop() {
+		active = false;
+	}
+}
+
+
 // Quiz class. Contains all the information about the current quiz. Including the path to the image,
 // the path to the vine clip, the correct answer, and three incorrect answers.
 // We need to figure out a process of randomly selecting three incorrect answers and ordering the four answers
@@ -51,8 +101,8 @@ class Quiz {
 	// This hashmap holds all of the vine info. The keys are the name of the vine and the value is an
 	// array of two Strings. The first element is the image path and the second is the video path.
 
-	HashMap<String, String[]> vines = new HashMap<String, String[]>();
-	private static prevIndex = -1;
+	private static HashMap<String, String[]> vines = new HashMap<String, String[]>();
+	private static int prevIndex = -1;
 
 	private String[] answers;
 	private int correctIndex;
@@ -69,9 +119,9 @@ class Quiz {
 		return correctIndex;
 	}
 	public String[] getAnswers() {
-		return answers();
+		return answers;
 	}
-	pubic String getImagePath() {
+	public String getImagePath() {
 		return imagePath;
 	}
 	public String getVideoPath() {
@@ -98,22 +148,23 @@ class Quiz {
 			randX = random.nextInt(vines.size());
 		}
 		// pick random incorrect answers for the quiz
-		int[] randAns = {randx, -1,-1,-1};
+		int[] randAns = {randX, -1,-1,-1};
+		int rand = 0;
 		for(int i = 1; i < randAns.length; i++) {
-			int rand = random.nextInt(vines.size());
+			rand = random.nextInt(vines.size());
 			// make sure there are no repeating answers
-			while(rand == randX && rand == randAns[1] && rand == randAn[2] && rand == randAn[3]) {
-				int rand = random.nextInt(vines.size());
+			while(rand == randX && rand == randAns[1] && rand == randAns[2] && rand == randAns[3]) {
+				rand = random.nextInt(vines.size());
 			}
-			ranAns[i] = rand;
+			randAns[i] = rand;
 		}
 		// randomly order the answers
 		int correctIdx = -1;
-		int[] answers = {-1,-1,-1,-1}
+		int[] answers = {-1,-1,-1,-1};
 		for(int i = 0; i < answers.length; i++) {
-			int rand = new random.nextInt(vines.size());
+			rand = random.nextInt(vines.size());
 			while(answers[rand] != -1) {
-				int rand = random.nextInt(vines.size());
+				rand = random.nextInt(vines.size());
 			}
 			if(randAns[i] == randX) {
 				correctIdx = rand;
@@ -177,20 +228,25 @@ class ClientServer implements Runnable {
 	private static Map<String,Integer> scores = new ConcurrentHashMap<String, Integer>();
 
 	// Static Quiz that will be updated by our main loop and sent to the client
-	private static Quiz currentQuiz = null;
-	private static int currentID = 0;
+	private static volatile Quiz currentQuiz = null;
+	private static volatile int currentID = 0;
 	private Thread t;
 	private String threadName;
 	private Client client;
 	private Socket socket;
+	private BufferedReader inFromClient;
+	private DataOutputStream outToClient;
 	private volatile boolean active;
 	public ClientServer(Socket connection) {
 		InetAddress address = connection.getInetAddress();
 		int port = connection.getPort();
 		int id = getNewID();
 		this.threadName = String.valueOf(id);
-		this.client = new Client(address, port , id);
+		// run something to get the clients username right here
+		this.client = new Client(address, port, id, username);
 		this.socket = connection;
+		this.inFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		this.outToClient = new DataOutputStream(socket.getOutputStream());
 		this.active = true;
 	}
 	// The run method will send the quiz info to the client.
@@ -198,7 +254,6 @@ class ClientServer implements Runnable {
 	// an score accordingly.
 	public void run() {
 		try {
-			BufferedReader inFromClient = new BufferedReader(new InputStreamReader(socket.getOutputStream()));
 			Quiz prevQuiz = null;
 
 			// run this loop until we detect that we are disconnected from the client
@@ -221,7 +276,7 @@ class ClientServer implements Runnable {
 					int answer = waitAndReceive(inFromClient);
 					// Receive client's answer to the quiz and update score
 					// Need to get variable string answer from client
-					score = currentQuiz.calcScore(answer);
+					int score = currentQuiz.calcScore(answer);
 					client.addScore(score);
 					// Update the scores map
 					scores.put(client.getName(), client.getScore());
@@ -233,7 +288,7 @@ class ClientServer implements Runnable {
 				}
 			}
 		} catch(IOException e) {
-			e.printTraceStack();
+			e.printStackTrace();
 		}
 	}
 	public void start() {
@@ -242,6 +297,10 @@ class ClientServer implements Runnable {
 			t.start();
 		}
 	}
+	public boolean isActive() {
+		return active;
+	}
+
 	// The sendQuiz function and the waitAndReceive function have redundant code. Can we fix this?
 
 	// Send the quiz in json format.
@@ -261,7 +320,7 @@ class ClientServer implements Runnable {
 						String imagePath = currentQuiz.getImagePath();
 						String videoPath = currentQuiz.getVideoPath();
 						String json = String.format("\"item1\":\"%s\", \"item2\":\"%s\", \"item3\":\"%s\", \"item4\":\"%s\", \"imgPath\":\"%s\", \"vidPath\":\"%s\"",
-							answer[0], answer[1], answer[2], answer[3], imagePath, videoPath);
+							answers[0], answers[1], answers[2], answers[3], imagePath, videoPath);
 
 						outToClient.writeBytes(json);
 						return;
@@ -270,7 +329,7 @@ class ClientServer implements Runnable {
 			}
 		} catch (IOException e) {
 			active = false;
-			e.printTraceStack();
+			e.printStackTrace();
 		}
 	}
 	// Wait to receive the client's answer to the Quiz. While we wait, check for page requests, ya know.
@@ -292,26 +351,26 @@ class ClientServer implements Runnable {
 						int contentLength = 0;
 						while(noBlank) {
 							line = inFromClient.readLine();
-							if(s.toLowerCase().contains("Content-length"))
-								contentLength = Integer.valueOf(s.split[1]);
-							if(s.equals(""))
+							if(line.toLowerCase().contains("Content-length"))
+								contentLength = Integer.valueOf(line.split(" ")[1]);
+							if(line.equals(""))
 								noBlank = false;
 						}
 						char[] body = new char[contentLength];
-						String body = String.valueOf(body);
-						int answer = Integer.valueOf(body.split("=")[1]);
+						String stringBody = String.valueOf(body);
+						int answer = Integer.valueOf(stringBody.split("=")[1]);
 						return answer;
 					}
 				}
 			}
 		} catch (IOException e) {
 			active = false;
-			e.printTraceStack();
+			e.printStackTrace();
 		}
 	}
 	public void sendScores() {
 		int nClients = scores.size();
-		String json = String.format("{\"clients\":\"%d\"", nClients)
+		String json = String.format("{\"clients\":\"%d\"", nClients);
 		for(Map.Entry<String,Integer> entry : scores.entrySet()) {
 			String username = entry.getKey();
 			int score = entry.getValue();
@@ -321,7 +380,7 @@ class ClientServer implements Runnable {
 		try {
 			outToClient.writeBytes(json);
 		} catch (IOException e) {
-			e.printTraceStack();
+			e.printStackTrace();
 			active = false;
 		}
 	}
@@ -329,7 +388,7 @@ class ClientServer implements Runnable {
 	// Get the html code for a given page name
 	// returns a single string with all the html code
 	public String getPage(String pageName) {
-		String body = getHTML(webPage);
+		String body = getHTML(pageName);
 		if(body.equals("Not Found") || body.equals("Something really went wrong")) {
 			String header = "HTTP/1.0 404 Not Found\n Server: VineQuiz/1.0 Java/9.0.0\n";
 			SimpleDateFormat formatter = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
@@ -371,5 +430,8 @@ class ClientServer implements Runnable {
 	}
 	public static int getNewID() {
 		return currentID++;
+	}
+	public static void updateQuiz(Quiz newQuiz){
+		currentQuiz = newQuiz;
 	}
 }
