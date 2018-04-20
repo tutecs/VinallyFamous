@@ -179,7 +179,7 @@ class ClientServer implements Runnable {
 				}
 				if(currentQuiz != prevQuiz) {
 					// Send the quiz info to the client using xmlhttprequest
-					sendGame();
+					sendQuiz();
 					int answer = waitAndReceive(inFromClient);
 					// Receive client's answer to the quiz and update score
 					// Need to get variable string answer from client
@@ -198,10 +198,13 @@ class ClientServer implements Runnable {
 			t.start();
 		}
 	}
-	// Wait to receive the client's answer to the Quiz. While we wait, check for page requests, ya know.
-	public int waitAndReceive(BufferedReader inFromClient) {
-		boolean drLupo = true;
-		while(drLupo) {
+
+	// The sendQuiz function and the waitAndReceive function have redundant code. Can we fix this?
+
+	// Send the quiz in json format.
+	// Wait for a GET request
+	public void sendQuiz() {
+		while(true) {
 			String request = inFromClient.readLine();
 			String[] requestWords = request.split(" ");
 			if(requestWords.length == 3) {
@@ -209,7 +212,30 @@ class ClientServer implements Runnable {
 					String page = getPage("index.html");
 					outToClient.writeBytes(page);
 				}
-				if(requestWords[0].equals("POST") && requestWords[1].equals("/quiz")) {
+				if(requestWords[0].equals("GET") && requestWords[1].equals("/quiz")) {
+					String[] answers = currentQuiz.getAnswers();
+					String imagePath = currentQuiz.getImagePath();
+					String videoPath = currentQuiz.getVideoPath();
+					String json = String.format("\"item1\":\"%s\", \"item2\":\"%s\", \"item3\":\"%s\", \"item4\":\"%s\", \"imgPath\":\"%s\", \"vidPath\":\"%s\"",
+						answer[0], answer[1], answer[2], answer[3], imagePath, videoPath);
+
+					outToClient.writeBytes(json);
+					return;
+				}
+			}
+		}
+	}
+	// Wait to receive the client's answer to the Quiz. While we wait, check for page requests, ya know.
+	public int waitAndReceive(BufferedReader inFromClient) {
+		while(true) {
+			String request = inFromClient.readLine();
+			String[] requestWords = request.split(" ");
+			if(requestWords.length == 3) {
+				if(requestWords[0].equals("GET") && requestWords[1].equals("/")) {
+					String page = getPage("index.html");
+					outToClient.writeBytes(page);
+				}
+				if(requestWords[0].equals("POST") && requestWords[1].equals("/submit")) {
 					// Code for parsing the POST request
 					// Should be in x-www-form-urlencoded format
 					boolean noBlank = true;
@@ -229,6 +255,11 @@ class ClientServer implements Runnable {
 				}
 			}
 		}
+	}
+	// Get the html code for a given page name
+	// returns a single string with all the html code
+	public String getPage(String pageName) {
+
 	}
 	public static int getNewID() {
 		return currentID++;
