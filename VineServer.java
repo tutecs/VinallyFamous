@@ -273,16 +273,7 @@ class ClientServer implements Runnable {
 				if(currentQuiz != prevQuiz) {
 					// Send the quiz info to the client using xmlhttprequest
 					sendQuiz();
-					int answer = waitAndReceive(inFromClient);
-					// Receive client's answer to the quiz and update score
-					// Need to get variable string answer from client
-					int score = currentQuiz.calcScore(answer);
-					client.addScore(score);
-					// Update the scores map
-					scores.put(client.getName(), client.getScore());
-
-					// Send the scores of each client to this client
-					sendScores();
+					waitAndReceive(inFromClient);
 
 					prevQuiz = currentQuiz;
 				}
@@ -322,7 +313,15 @@ class ClientServer implements Runnable {
 						String json = String.format("\"item1\":\"%s\", \"item2\":\"%s\", \"item3\":\"%s\", \"item4\":\"%s\", \"imgPath\":\"%s\", \"vidPath\":\"%s\"",
 							answers[0], answers[1], answers[2], answers[3], imagePath, videoPath);
 
-						outToClient.writeBytes(json);
+						String header = "HTTP/1.0 200 OK\n Server: VineQuiz/1.0 Java/9.0.0\n";
+						SimpleDateFormat formatter = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
+						Date current_time = new Date();
+						String date = formatter.format(current_time).toString();
+						int bodyLength = json.getBytes().length;
+						header = header + date + "\nContent-type: text/json; charset=utf-8\nContent-Length: ";
+						header = header + String.valueOf(bodyLength);
+						String headerBody = header + json;
+						outToClient.writeBytes(headerBody);
 						return;
 					}
 				}
@@ -333,7 +332,7 @@ class ClientServer implements Runnable {
 		}
 	}
 	// Wait to receive the client's answer to the Quiz. While we wait, check for page requests, ya know.
-	public int waitAndReceive(BufferedReader inFromClient) {
+	public void waitAndReceive(BufferedReader inFromClient) {
 		try {
 			while(true) {
 				String request = inFromClient.readLine();
@@ -359,7 +358,14 @@ class ClientServer implements Runnable {
 						char[] body = new char[contentLength];
 						String stringBody = String.valueOf(body);
 						int answer = Integer.valueOf(stringBody.split("=")[1]);
-						return answer;
+						
+						int score = currentQuiz.calcScore(answer);
+						client.addScore(score);
+						// Update the scores map
+						scores.put(client.getName(), client.getScore());
+						
+						// Send the scores of each client to this client
+						sendScores();
 					}
 				}
 			}
@@ -369,16 +375,31 @@ class ClientServer implements Runnable {
 		}
 	}
 	public void sendScores() {
+		String header = "HTTP/1.0 200 OK\n Server: VineQuiz/1.0 Java/9.0.0\n";
+		SimpleDateFormat formatter = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
+		Date current_time = new Date();
+		String date = formatter.format(current_time).toString();
+
 		int nClients = scores.size();
+		HashMap<String, Integer> sortedScores = sortByValues(scores);
 		String json = String.format("{\"clients\":\"%d\"", nClients);
-		for(Map.Entry<String,Integer> entry : scores.entrySet()) {
+		i = 0;
+		Set scoreSet = sortedScores.entrySet();
+		Iterator scoreIterator = scoreSet.iterator();
+		while(i < 10) {
+			Map.Entry<String,Integer> entry = scoreIterator.next();
 			String username = entry.getKey();
 			int score = entry.getValue();
 			json = String.format("%s,\"%s\":\"%d\"", json, username, score);
+			i++;
 		}
 		json = json + "}";
+		int bodyLength = json.getBytes().length;
+		header = header + date + "\nContent-type: text/json; charset=utf-8\nContent-Length: ";
+		header = header + String.valueOf(bodyLength);
+		String headerBody = header + json;
 		try {
-			outToClient.writeBytes(json);
+			outToClient.writeBytes(headerBody);
 		} catch (IOException e) {
 			e.printStackTrace();
 			active = false;
@@ -433,5 +454,21 @@ class ClientServer implements Runnable {
 	}
 	public static void updateQuiz(Quiz newQuiz){
 		currentQuiz = newQuiz;
+	}
+	private static HashMap sortByValues(HashMap map) { 
+		List list = new LinkedList(map.entrySet());
+		// Defined Custom Comparator here
+		Collections.sort(list, new Comparator() {
+			public int compare(Object o1, Object o2) {
+				return ((Comparable) ((Map.Entry) (o1)).getValue())
+					.compareTo(((Map.Entry) (o2)).getValue());
+			}
+		});
+		HashMap sortedHashMap = new LinkedHashMap();
+		for (Iterator it = list.iterator(); it.hasNext();) {
+			Map.Entry entry = (Map.Entry) it.next();
+			sortedHashMap.put(entry.getKey(), entry.getValue());
+		} 
+		return sortedHashMap;
 	}
 }
