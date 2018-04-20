@@ -1,3 +1,8 @@
+// VineQuiz server program.
+// Ethan Duryea, Elliot Spicer, Joshua Weller, John Zamites
+// CSCI 420: Networking, Project 2018, April 2018
+
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -168,6 +173,7 @@ class ClientServer implements Runnable {
 			BufferedReader inFromClient = new BufferedReader(new InputStreamReader(socket.getOutputStream()));
 			Quiz prevQuiz = null;
 			// We should probably add some kind of exit to this loop
+			// Like when the client disconnects
 			while(true) {
 				String request = inFromClient.readLine();
 				String[] requestWords = request.split(" ");
@@ -259,7 +265,44 @@ class ClientServer implements Runnable {
 	// Get the html code for a given page name
 	// returns a single string with all the html code
 	public String getPage(String pageName) {
-
+		String body = getHTML(webPage);
+		if(body.equals("Not Found") || body.equals("Something really went wrong")) {
+			String header = "HTTP/1.0 404 Not Found\n Server: VineQuiz/1.0 Java/9.0.0\n";
+			SimpleDateFormat formatter = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
+			Date current_time = new Date();
+			String date = formatter.format(current_time).toString();
+			header = header + date;
+			return header;
+		}
+		else {
+			String header = "HTTP/1.0 200 OK\n Server: VineQuiz/1.0 Java/9.0.0\n";
+			SimpleDateFormat formatter = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
+			Date current_time = new Date();
+			String date = formatter.format(current_time).toString();
+			int bodyLength = body.getBytes().length;
+			header = header + date + "\nContent-type: text/html; charset=utf-8\nContent-Length: ";
+			header = header + String.valueOf(bodyLength);
+			String headerBody = header + "\n\n" + body;
+			return headerBody;
+		}
+	}
+	private static String getHTML(String filename)
+	{
+		try
+		{
+			String body = new String(Files.readAllBytes(Paths.get(filename)));
+			return body;
+		}
+		catch (FileNotFoundException ex)
+		{
+			System.out.printf("Unable to open file: %s", filename);
+			return "Not Found";
+		}
+		catch (IOException ex)
+		{
+			ex.printStackTrace();
+		}
+		return "Something really went wrong";
 	}
 	public static int getNewID() {
 		return currentID++;
