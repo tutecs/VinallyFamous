@@ -11,20 +11,36 @@ import java.util.concurrent.*;
 public class VineServer {
 	private static int port = 8080;
 	public static void main(String[] args) {
-		ConcurrentHashMap clientScores = new ConcurrentHashMap();
+		ArrayList<ClientServer> clients = new ArrayList<ClientServer>();
 		try {
 			ServerSocket listenSocket = new ServerSocket(port);
+			//
+			// TODO :
+			// 	Get a new quiz every 7 seconds.
+			// 	Update our client list every loop. ie check if each thread is still active
+			// 	We need to split the connection handling and the quiz serving.
+			// 	We should create another thread to handle the quiz serving.
+			Date date = new Date();
+			long beginTime = date.getTime();
 			while(true) {
-
-				// Socket connectionSocket = listenSocket.accept();
+				Socket connectionSocket = listenSocket.accept();
 				ClientServer server = new ClientServer(connectionSocket);
 				server.start();
+				clients.add(server);
+				ClientServer server = new ClientServer(connectionSocket);
+				server.start();
+				clients.add(server);
+				long currentTime = date.getTime();
+				long diffInMillies = currentTime - beginTime();
+				long diffInSeconds = TimeUnit.SECONDS.convert(diffInMillies, TimeUnit.MILLIESECONDS);
+				if(diffInSeconds >= )
 
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
+
 }
 // Quiz class. Contains all the information about the current quiz. Including the path to the image,
 // the path to the vine clip, the correct answer, and three incorrect answers.
@@ -184,8 +200,8 @@ class ClientServer implements Runnable {
 		try {
 			BufferedReader inFromClient = new BufferedReader(new InputStreamReader(socket.getOutputStream()));
 			Quiz prevQuiz = null;
-			// We should probably add some kind of exit to this loop
-			// Like when the client disconnects
+
+			// run this loop until we detect that we are disconnected from the client
 			while(active) {
 				String request = inFromClient.readLine();
 				if(request == null) {
