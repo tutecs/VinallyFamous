@@ -101,7 +101,7 @@ class Quiz {
 	// This hashmap holds all of the vine info. The keys are the name of the vine and the value is an
 	// array of two Strings. The first element is the image path and the second is the video path.
 
-	private static HashMap<String, String[]> vines = new HashMap<String, String[]>();
+	private static HashMap<String, String[]> vines = readVineFile();
 	private static int prevIndex = -1;
 
 	private String[] answers;
@@ -182,6 +182,25 @@ class Quiz {
 		String[] paths = vines.get(correctAns);
 		// return a new Quiz object contain the possible answers, the correct answer's index, and the paths
 		return new Quiz(answerStrings, correctIdx, paths[0], paths[1]);
+	}
+	public static HashMap<String, String[]> readVineFile() {
+		HashMap<String, String[]> vines = new HashMap<String, String[]>();
+		try {
+			FileReader fileReader = new FileReader("vines.txt");
+			BufferedReader reader = new BufferedReader(fileReader);
+			String line = null;
+			while((line = reader.readLine()) != null) {
+				String[] elements = line.split(",");
+				String vineName = elements[0];
+				String[] paths = {elements[1], elements[2]};
+				vines.put(vineName, paths);
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return vines;
 	}
 }
 
