@@ -236,18 +236,28 @@ class ClientServer implements Runnable {
 	private Socket socket;
 	private BufferedReader inFromClient;
 	private DataOutputStream outToClient;
+	private int state;
+	// states:
+	//	0 - just started, need username
+	// 	1 - In game, sent quiz, need answer
+	//	2 - In game, received answer, need to send quiz
 	private volatile boolean active;
 	public ClientServer(Socket connection) {
-		InetAddress address = connection.getInetAddress();
-		int port = connection.getPort();
-		int id = getNewID();
-		this.threadName = String.valueOf(id);
-		// run something to get the clients username right here
-		this.client = new Client(address, port, id, username);
-		this.socket = connection;
-		this.inFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-		this.outToClient = new DataOutputStream(socket.getOutputStream());
-		this.active = true;
+		try {
+			InetAddress address = connection.getInetAddress();
+			int port = connection.getPort();
+			int id = getNewID();
+			this.threadName = String.valueOf(id);
+			// run something to get the clients username right here
+			this.client = new Client(address, port, id, null);
+			this.socket = connection;
+			this.inFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			this.outToClient = new DataOutputStream(socket.getOutputStream());
+			this.state = 0;
+			this.active = true;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	// The run method will send the quiz info to the client.
 	// We will also receive which answer the client choose, determine if the answer was correct, and give
@@ -265,9 +275,8 @@ class ClientServer implements Runnable {
 				}
 				String[] requestWords = request.split(" ");
 				if(requestWords.length == 3) {
-					if(requestWords[0].equals("GET") && requestWords[1].equals("/")) {
-						String page = getPage("index.html");
-						outToClient.writeBytes(page);
+					if(requestWords[0].equals("GET")) {
+						sendPage(requestWords[1]);
 					}
 				}
 				if(currentQuiz != prevQuiz) {
@@ -293,20 +302,78 @@ class ClientServer implements Runnable {
 	}
 
 	// The sendQuiz function and the waitAndReceive function have redundant code. Can we fix this?
-
+	public void sendPage(String pageName) {
+		String page = "";
+		switch (pageName) {
+			case "/":
+				page = getPage("index.html");
+			case "/quiz":
+				page = getPage("quiz.html");
+			default:
+				page = getPage(pageName);
+		}
+		try {
+			outToClient.writeBytes(page);
+		} catch (IOException e) {
+			active = false;
+			e.printStackTrace();
+		}
+	}
 	// Send the quiz in json format.
 	// Wait for a GET request
+	public String getUsername() {
+		try {
+			while(true) {
+				String request = inFromClient.readLine();
+				String[] requestWords = request.split(" ");
+				if(requestWords.length == 3) {
+					if(requestWords[0].equals("GET")) {
+						sendPage(requestWords[1]);
+					}
+					if(requestWords[0].equals("POST") && requestWords[1].equals("/username")) {
+						boolean noBlank = true;
+						String line = "";
+						int contentLength = 0;
+						while(noBlank) {
+							line = inFromClient.readLine();
+							if(line.toLowerCase().contains("Content-length"))
+								contentLength = Integer.valueOf(line.split(" ")[1]);
+							if(line.equals(""))
+								noBlank = false;
+						}
+						char[] body = new char[contentLength];
+						for(int i = 0; i < body.length; i++) {
+							if(body[i] == '+')
+								body[i] = ' ';
+							if(body[i] == '%') {
+								String hex = "" + body[i+1] + body[i+2];
+								char newChar = (char) (Integer.parseInt(hex, 16));
+								body[i] = newChar;
+								body[i+1] = Character.MIN_VALUE;
+								body[i+2] = Character.MIN_VALUE;
+								i += 2;
+							}
+						}
+						String stringBody = String.valueOf(body);
+						return stringBody;
+					}
+				}
+			}
+		} catch (IOException e) {
+			active = false;
+			e.printStackTrace();
+		}
+		return null;
+	}
+	// Send new quiz info in json format
+	// {"item1":"", "item2":"", "item3":"", "item4":"", "imgPath":"", "vidPath":""}
 	public void sendQuiz() {
 		try {
 			while(true) {
 				String request = inFromClient.readLine();
 				String[] requestWords = request.split(" ");
 				if(requestWords.length == 3) {
-					if(requestWords[0].equals("GET") && requestWords[1].equals("/")) {
-						String page = getPage("index.html");
-						outToClient.writeBytes(page);
-					}
-					if(requestWords[0].equals("GET") && requestWords[1].equals("/quiz")) {
+					if(requestWords[0].equals("GET") && requestWords[1].equals("/getQuiz")) {
 						String[] answers = currentQuiz.getAnswers();
 						String imagePath = currentQuiz.getImagePath();
 						String videoPath = currentQuiz.getVideoPath();
@@ -324,6 +391,9 @@ class ClientServer implements Runnable {
 						outToClient.writeBytes(headerBody);
 						return;
 					}
+					else if(requestWords[0].equals("GET")) {
+						sendPage(requestWords[1]);
+					}
 				}
 			}
 		} catch (IOException e) {
@@ -338,9 +408,8 @@ class ClientServer implements Runnable {
 				String request = inFromClient.readLine();
 				String[] requestWords = request.split(" ");
 				if(requestWords.length == 3) {
-					if(requestWords[0].equals("GET") && requestWords[1].equals("/")) {
-						String page = getPage("index.html");
-						outToClient.writeBytes(page);
+					if(requestWords[0].equals("GET")) {
+						sendPage(requestWords[1]);
 					}
 					if(requestWords[0].equals("POST") && requestWords[1].equals("/submit")) {
 						// Code for parsing the POST request
@@ -383,11 +452,11 @@ class ClientServer implements Runnable {
 		int nClients = scores.size();
 		HashMap<String, Integer> sortedScores = sortByValues(scores);
 		String json = String.format("{\"clients\":\"%d\"", nClients);
-		i = 0;
+		int i = 0;
 		Set scoreSet = sortedScores.entrySet();
 		Iterator scoreIterator = scoreSet.iterator();
 		while(i < 10) {
-			Map.Entry<String,Integer> entry = scoreIterator.next();
+			Map.Entry<String,Integer> entry = (Map.Entry) scoreIterator.next();
 			String username = entry.getKey();
 			int score = entry.getValue();
 			json = String.format("%s,\"%s\":\"%d\"", json, username, score);
@@ -455,7 +524,7 @@ class ClientServer implements Runnable {
 	public static void updateQuiz(Quiz newQuiz){
 		currentQuiz = newQuiz;
 	}
-	private static HashMap sortByValues(HashMap map) { 
+	private static HashMap sortByValues(Map map) { 
 		List list = new LinkedList(map.entrySet());
 		// Defined Custom Comparator here
 		Collections.sort(list, new Comparator() {
