@@ -453,7 +453,7 @@ class ClientServer implements Runnable {
 						scores.put(client.getName(), client.getScore());
 						
 						// Send the scores of each client to this client
-						sendScores();
+						sendScores(currentQuiz.getCorrect(), client.getScore());
 					}
 				}
 			}
@@ -462,7 +462,7 @@ class ClientServer implements Runnable {
 			e.printStackTrace();
 		}
 	}
-	public void sendScores() {
+	public void sendScores(int correctIdx, int clientScore) {
 		String header = "HTTP/1.0 200 OK\n Server: VineQuiz/1.0 Java/9.0.0\n";
 		SimpleDateFormat formatter = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z");
 		Date current_time = new Date();
@@ -470,7 +470,7 @@ class ClientServer implements Runnable {
 
 		int nClients = scores.size();
 		HashMap<String, Integer> sortedScores = sortByValues(scores);
-		String json = String.format("{\"clients\":\"%d\"", nClients);
+		String json = String.format("{{\"correctAns\":\"%d\",\"myscore\":\"%d\"}", correctIdx, clientScore);
 		int i = 0;
 		Set scoreSet = sortedScores.entrySet();
 		Iterator scoreIterator = scoreSet.iterator();
@@ -478,7 +478,7 @@ class ClientServer implements Runnable {
 			Map.Entry<String,Integer> entry = (Map.Entry) scoreIterator.next();
 			String username = entry.getKey();
 			int score = entry.getValue();
-			json = String.format("%s,\"%s\":\"%d\"", json, username, score);
+			json = String.format("%s,{\"username\":\"%s\",\"score\":\"%d\"}", json, username, score);
 			i++;
 		}
 		json = json + "}";
