@@ -1,43 +1,100 @@
 <html>
-    <head>
+<head>
 <script>
-function check(vine) {
-    document.getElementById("answer").value=vine;
+var gameTime = 6000;
+function getQuiz() {
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			var json = JSON.parse(this.responseText);
+			var labels = document.getElementsByTagName("label");
+			labels[0].innerHTML = json[0].item1;
+			labels[1].innerHTML = json[0].item2;
+			labels[2].innerHTML = json[0].item3;
+			labels[3].innerHTML = json[0].item4;
+			document.getElementById("vineimg").src = json[0].imgPath;
+			document.getElementById("vid").src = json[0].vidPath;
+			gametime = parseInt(json[0].time);
+			return json;
+		}
+	};
+	xhttp.open("GET", "/getQuiz", true);
+	xhttp.send();
 }
-
+function sendAnswer() {
+	document.getElementById("vineimg").style.display = "none";
+	var vid = document.getElementById("vid");
+	vid.style.display = "block";
+	vid.src += "&autoplay=1";
+	document.getElementById("fieldset").disabled = true;
+	var data = new FormData(form);
+	var object = {}
+	data.forEach(function(value,key) {
+		object[key] = value;
+	});
+	var json = JSON.stringify(object);
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadrstatechange = function() {
+		if(this.readyState == 4 && this.status == 200) {
+			var json = JSON.parse(this.responseText);
+			document.getElementById("yourScore").innerHTML = json[0].myscore;
+			var correctAns = json[0].correctAns;
+			var correctId = "q" + correctAns;
+			document.getElementById(correctId).style.background-color = "green";
+			for(i = 1; i < json.length; i++) {
+				var id = "score" + i.toString();
+				document.getElementById(id).innerHTML = json[i].username + " : " + json[i].score;
+			}
+		}
+	};
+	xhttp.open("POST", "/submit", true);
+	xhttp.send(data);
+}
+setInterval(game, gameTime + 7000);
+function game() {
+	document.getElementById("vid").style.display = "none";
+	document.getElementById("vineimg").style.display = "block";
+	document.getElementById("answers").style.display = "block";
+	document.getElementById("fieldset").disabled = false;
+	var elements = document.getElementsByClassName("answers");
+	for(i = 0; i < elements.length; i++) {
+		elements[i].style.background-color = "transparent";
+	}
+	setTimeout(sendAnswer, gameTime);
+	getQuiz();
+}
 </script>
-
-<script type="text/javascript" src="/vinequiz.js"></script>
-<script type="text/javascript" src="/quiz-1.js"></script> 
-        <title> VINE QUIZ GAME </title>
-	<h1> Which Vine is this? </h1>
-	<img src = image alt = imageDesc >
-	
-
-
-
-
-
-
+<title> VINE QUIZ GAME </title>
 </head>
-<body>
+<h1> Which Vine is this? </h1>	
 
-<p class="question">1. What is the answer to this question?</p>
-<ul class="answers">
-<input type="radio" name="q1" value="a" id="q1a"><label for="q1a">Answer 1</label><br/>
-<input type="radio" name="q1" value="b" id="q1b"><label for="q1b">Answer 2</label><br/>
-<input type="radio" name="q1" value="c" id="q1c"><label for="q1c">Answer 3</label><br/>
-<input type="radio" name="q1" value="d" id="q1d"><label for="q1d">Answer 4</label><br/>
-</ul>
-<button type ="button"> Check Answer! </button>
- 
-<div id="quiz"></div>
-<button id = "submit"> Submit Quiz </button>
-<div id = "results"> </div>
-Show me the answers!
-</div> 
-
-<div id="category1">
-<p><strong>Question 1:</strong> The correct answer is the <strong>Answer 1</strong>.</p>
-</div> 
-
+<body onload="getQuiz()">
+<div id="scores" style="width: 50%; float: right;">
+	<ol>
+		<li id="score1"></li>
+		<li id="score2"></li>
+		<li id="score3"></li>
+		<li id="score4"></li>
+		<li id="score5"></li>
+		<li id="score6"></li>
+		<li id="score7"></li>
+		<li id="score8"></li>
+		<li id="score9"></li>
+		<li id="score10"></li>
+	</ol>
+	<p> Your Score: <span id="yourScore"> </span> </p>
+</div>
+<div id="game" style="width: 50%; float: right;">
+	<img scr="" alt="Vine" id="vineimg" style="display: none">
+	<iframe width="420" height="315" src="" style="display: none" id="vid"></iframe>
+	<form id="answers" style="display: none">
+		<fieldset id="fieldset">
+			<div id="q1" class="answers"><input type="radio" name="quiz" value="1"><label for='q1'></label></div><br/>
+			<div id="q2" class="answers"><input type="radio" name="quiz" value="2"><label for='q2'></label></div><br/>
+			<div id="q3" class="answers"><input type="radio" name="quiz" value="3"><label for='q3'></label></div><br/>
+			<div id="q4" class="answers"><input type="radio" name="quiz" value="4"><label for='q4'></label></div><br/>
+		</fieldset>
+	</form>
+</div>
+</body>
+</html>
