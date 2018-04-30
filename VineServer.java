@@ -267,11 +267,12 @@ class ClientServer implements Runnable {
 			int port = connection.getPort();
 			int id = getNewID();
 			this.threadName = String.valueOf(id);
-			// run something to get the clients username right here
-			this.client = new Client(address, port, id, null);
 			this.socket = connection;
 			this.inFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 			this.outToClient = new DataOutputStream(socket.getOutputStream());
+			String username = getUsername();
+			System.out.println(username);
+			this.client = new Client(address, port, id, username);
 			this.state = 0;
 			this.active = true;
 		} catch (IOException e) {
@@ -282,6 +283,7 @@ class ClientServer implements Runnable {
 	// We will also receive which answer the client choose, determine if the answer was correct, and give
 	// an score accordingly.
 	public void run() {
+		System.out.println("Running thread");
 		try {
 			Quiz prevQuiz = null;
 
@@ -319,17 +321,19 @@ class ClientServer implements Runnable {
 	public boolean isActive() {
 		return active;
 	}
-
+	
 	// The sendQuiz function and the waitAndReceive function have redundant code. Can we fix this?
 	public void sendPage(String pageName) {
 		String page = "";
-		switch (pageName) {
-			case "/":
-				page = getPage("index.html");
-			case "/quiz":
-				page = getPage("quiz.html");
-			default:
-				page = getPage(pageName);
+		if(pageName.equals("/")) {
+			System.out.println("Serving vine website");
+			page = getPage("VineWebsite.html");
+		}
+		else if(pageName.equals("/")) {
+			page = getPage("vinequiz.html");
+		}
+		else {
+			page = getPage("not found");
 		}
 		try {
 			outToClient.writeBytes(page);
@@ -341,40 +345,48 @@ class ClientServer implements Runnable {
 	// Send the quiz in json format.
 	// Wait for a GET request
 	public String getUsername() {
+		System.out.println("Running getUsername");
 		try {
 			while(true) {
 				String request = inFromClient.readLine();
-				String[] requestWords = request.split(" ");
-				if(requestWords.length == 3) {
-					if(requestWords[0].equals("GET")) {
-						sendPage(requestWords[1]);
-					}
-					if(requestWords[0].equals("POST") && requestWords[1].equals("/username")) {
-						boolean noBlank = true;
-						String line = "";
-						int contentLength = 0;
-						while(noBlank) {
-							line = inFromClient.readLine();
-							if(line.toLowerCase().contains("Content-length"))
-								contentLength = Integer.valueOf(line.split(" ")[1]);
-							if(line.equals(""))
-								noBlank = false;
+				if(request != null) {
+					System.out.printf("GET INFO: %s\n", request);
+					String[] requestWords = request.split(" ");
+					if(requestWords.length == 3) {
+						if(requestWords[0].equals("GET")) {
+							System.out.printf("requested page from GET %s\n", requestWords[1]);
+							sendPage(requestWords[1]);
 						}
-						char[] body = new char[contentLength];
-						for(int i = 0; i < body.length; i++) {
-							if(body[i] == '+')
-								body[i] = ' ';
-							if(body[i] == '%') {
-								String hex = "" + body[i+1] + body[i+2];
-								char newChar = (char) (Integer.parseInt(hex, 16));
-								body[i] = newChar;
-								body[i+1] = Character.MIN_VALUE;
-								body[i+2] = Character.MIN_VALUE;
-								i += 2;
+						if(requestWords[0].equals("POST") && requestWords[1].equals("/username")) {
+							boolean noBlank = true;
+							String line = "";
+							int contentLength = 0;
+							while(noBlank) {
+								line = inFromClient.readLine();
+								if(line.toLowerCase().contains("Content-length"))
+									contentLength = Integer.valueOf(line.split(" ")[1]);
+								if(line.equals(""))
+									noBlank = false;
 							}
+							char[] body = new char[contentLength];
+							for(int i = 0; i < body.length; i++) {
+								if(body[i] == '+')
+									body[i] = ' ';
+								if(body[i] == '%') {
+									String hex = "" + body[i+1] + body[i+2];
+									char newChar = (char) (Integer.parseInt(hex, 16));
+									body[i] = newChar;
+									body[i+1] = Character.MIN_VALUE;
+									body[i+2] = Character.MIN_VALUE;
+									i += 2;
+								}
+							}
+							String stringBody = String.valueOf(body);
+							stringBody = stringBody.substring(6);
+							System.out.println(stringBody);
+							sendPage("/quiz");
+							return stringBody;
 						}
-						String stringBody = String.valueOf(body);
-						return stringBody;
 					}
 				}
 			}
@@ -521,6 +533,7 @@ class ClientServer implements Runnable {
 	// get the html code from the file
 	private static String getHTML(String filename)
 	{
+		System.out.printf("Opening file: %s\n", filename);
 		try
 		{
 			String body = new String(Files.readAllBytes(Paths.get(filename)));
@@ -533,6 +546,7 @@ class ClientServer implements Runnable {
 		}
 		catch (IOException ex)
 		{
+			System.out.printf("Error opening file: %s", filename);
 			ex.printStackTrace();
 		}
 		return "Something really went wrong";
