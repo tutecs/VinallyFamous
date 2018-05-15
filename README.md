@@ -8,7 +8,7 @@ Ethan Duryea, Elliot Spicer, Joshua Weller, John Zamites
 
 Simply run `javac VineServer.java`
 Then `java VineServer`
-
+To connect, go to LAN address of the machine running the server in web browser. Server will be running on port 8080.
 ## Issues
 
 1. A user cannot open multiple tabs of game in a browser without breaking game.
