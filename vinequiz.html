@@ -1,100 +1,154 @@
 <html>
 <head>
 <script>
+
 var gameTime = 6000;
+var waitTime;
+function submitUsername() {
+	document.getElementById("username-content").style.display = "none";
+	console.log("Doing the thing");
+	var username = document.getElementById("username").value;
+	var xhttp = new XMLHttpRequest();
+	xhttp.onreadystatechange = function() {
+		if(this.readyState == 4 && this.status == 200) {
+			var json = JSON.parse(this.responseText);
+			console.log(json.item1);
+			var labels = document.getElementsByTagName("label");
+			labels[0].innerHTML = json.item1;
+			labels[1].innerHTML = json.item2;
+			labels[2].innerHTML = json.item3;
+			labels[3].innerHTML = json.item4;
+			var vidSrc = json.vidPath;
+			var vidSrc = vidSrc.replace("watch?v=", "embed/");
+			var vidSrc = vidSrc.concat("?enablejsapi=1");
+			document.getElementById("vineimg").src = json.imgPath;
+			document.getElementById("vid").src = vidSrc;
+			waitTime = parseInt(json.time);
+			console.log(waitTime);
+			runGame();
+		}
+	};
+	xhttp.open("POST", "/username", true);
+	xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+	xhttp.send(username);
+}
 function getQuiz() {
 	var xhttp = new XMLHttpRequest();
 	xhttp.onreadystatechange = function() {
 		if (this.readyState == 4 && this.status == 200) {
 			var json = JSON.parse(this.responseText);
 			var labels = document.getElementsByTagName("label");
-			labels[0].innerHTML = json[0].item1;
-			labels[1].innerHTML = json[0].item2;
-			labels[2].innerHTML = json[0].item3;
-			labels[3].innerHTML = json[0].item4;
-			document.getElementById("vineimg").src = json[0].imgPath;
-			document.getElementById("vid").src = json[0].vidPath;
-			gametime = parseInt(json[0].time);
-			return json;
+			labels[0].innerHTML = json.item1;
+			labels[1].innerHTML = json.item2;
+			labels[2].innerHTML = json.item3;
+			labels[3].innerHTML = json.item4;
+			var vidSrc = json.vidPath;
+			var vidSrc = vidSrc.replace("watch?v=", "embed/");
+			var vidSrc = vidSrc.concat("?enablejsapi=1");
+			document.getElementById("vineimg").src = json.imgPath;
+			document.getElementById("vid").src = vidSrc;
 		}
 	};
 	xhttp.open("GET", "/getQuiz", true);
 	xhttp.send();
 }
 function sendAnswer() {
+	console.log("Running sendAnswer");
 	document.getElementById("vineimg").style.display = "none";
 	var vid = document.getElementById("vid");
 	vid.style.display = "block";
-	vid.src += "&autoplay=1";
 	document.getElementById("fieldset").disabled = true;
-	var data = new FormData(form);
-	var object = {}
-	data.forEach(function(value,key) {
-		object[key] = value;
-	});
-	var json = JSON.stringify(object);
+	var answers = document.getElementsByName("quiz");
+	var selectedAnswer;
+	for(var i = 0; i < answers.length; i++) {
+		if(answers[i].checked) {
+			selectedAnswer = answers[i].value;
+			answers[i].checked = false;
+		}
+	}
+	if(selectedAnswer == null) {
+		selectedAnswer = -1;
+	}
 	var xhttp = new XMLHttpRequest();
-	xhttp.onreadrstatechange = function() {
+	xhttp.onreadystatechange = function() {
 		if(this.readyState == 4 && this.status == 200) {
-			var json = JSON.parse(this.responseText);
-			document.getElementById("yourScore").innerHTML = json[0].myscore;
-			var correctAns = json[0].correctAns;
+			var fromjson = JSON.parse(this.responseText);
+			document.getElementById("yourScore").innerHTML = fromjson[0].myscore;
+			var correctAns = fromjson[0].correctAns;
 			var correctId = "q" + correctAns;
-			document.getElementById(correctId).style.background-color = "green";
-			for(i = 1; i < json.length; i++) {
+			console.log(correctId);
+			document.getElementById(correctId).style.backgroundColor = "green";
+			for(i = 1; i < fromjson.length; i++) {
 				var id = "score" + i.toString();
-				document.getElementById(id).innerHTML = json[i].username + " : " + json[i].score;
+				document.getElementById(id).innerHTML = fromjson[i].username + " : " + fromjson[i].score;
 			}
 		}
 	};
+	console.log(selectedAnswer);
 	xhttp.open("POST", "/submit", true);
-	xhttp.send(data);
+	xhttp.send(selectedAnswer);
 }
-setInterval(game, gameTime + 7000);
+function runGame() {
+	waitForGame();
+	setInterval(game, gameTime + 7000);
+}
+function waitForGame() {
+	document.getElementById("waiting").style.display = "block";
+	setTimeout(game,waitTime);
+}
 function game() {
+	getQuiz();
+	document.getElementById("waiting").style.display = "none";
 	document.getElementById("vid").style.display = "none";
 	document.getElementById("vineimg").style.display = "block";
 	document.getElementById("answers").style.display = "block";
 	document.getElementById("fieldset").disabled = false;
 	var elements = document.getElementsByClassName("answers");
 	for(i = 0; i < elements.length; i++) {
-		elements[i].style.background-color = "transparent";
+		elements[i].style.backgroundColor = "transparent";
 	}
 	setTimeout(sendAnswer, gameTime);
-	getQuiz();
 }
 </script>
 <title> VINE QUIZ GAME </title>
 </head>
-<h1> Which Vine is this? </h1>	
 
-<body onload="getQuiz()">
-<div id="scores" style="width: 50%; float: right;">
-	<ol>
-		<li id="score1"></li>
-		<li id="score2"></li>
-		<li id="score3"></li>
-		<li id="score4"></li>
-		<li id="score5"></li>
-		<li id="score6"></li>
-		<li id="score7"></li>
-		<li id="score8"></li>
-		<li id="score9"></li>
-		<li id="score10"></li>
-	</ol>
-	<p> Your Score: <span id="yourScore"> </span> </p>
-</div>
-<div id="game" style="width: 50%; float: right;">
-	<img scr="" alt="Vine" id="vineimg" style="display: none">
-	<iframe width="420" height="315" src="" style="display: none" id="vid"></iframe>
-	<form id="answers" style="display: none">
-		<fieldset id="fieldset">
-			<div id="q1" class="answers"><input type="radio" name="quiz" value="1"><label for='q1'></label></div><br/>
-			<div id="q2" class="answers"><input type="radio" name="quiz" value="2"><label for='q2'></label></div><br/>
-			<div id="q3" class="answers"><input type="radio" name="quiz" value="3"><label for='q3'></label></div><br/>
-			<div id="q4" class="answers"><input type="radio" name="quiz" value="4"><label for='q4'></label></div><br/>
-		</fieldset>
-	</form>
-</div>
+<body>
+	<div id="username-content">
+		<h1> Enter Your Username pls </h1>
+		<input type="text" name="username" id="username"><br />
+		<input type="button" value="Submit" onclick="submitUsername() ">
+	</div>
+	<div id="scores" style="width: 50%; float: right;">
+		<ol>
+			<li id="score1"></li>
+			<li id="score2"></li>
+			<li id="score3"></li>
+			<li id="score4"></li>
+			<li id="score5"></li>
+			<li id="score6"></li>
+			<li id="score7"></li>
+			<li id="score8"></li>
+			<li id="score9"></li>
+			<li id="score10"></li>
+		</ol>
+		<p> Your Score: <span id="yourScore"> </span> </p>
+	</div>
+	<div id="game" style="width: 50%; float: right;">
+		<h1> Which Vine is this? </h1>
+		<h2 id="waiting" style="display: none"> Starting Game... </h2>
+
+			<img scr="" alt="Vine" id="vineimg" style="display: none">
+
+		<iframe width="420" height="315" src="" style="display: none" id="vid"></iframe>
+		<form id="answers" style="display: none">
+			<fieldset id="fieldset">
+				<div id="q0" class="answers"><input type="radio" name="quiz" value="0"><label for='q0'></label></div><br/>
+				<div id="q1" class="answers"><input type="radio" name="quiz" value="1"><label for='q1'></label></div><br/>
+				<div id="q2" class="answers"><input type="radio" name="quiz" value="2"><label for='q2'></label></div><br/>
+				<div id="q3" class="answers"><input type="radio" name="quiz" value="3"><label for='q3'></label></div><br/>
+			</fieldset>
+		</form>
+	</div>
 </body>
 </html>
